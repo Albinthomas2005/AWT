@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
   GraduationCap, 
   UserCheck, 
@@ -9,27 +9,97 @@ import {
   Sparkles, 
   Lock, 
   CheckCircle2, 
-  Zap,
-  Award,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  HelpCircle,
+  X,
+  Phone,
+  Globe,
+  Hash,
   BookOpen,
-  Briefcase
+  Calendar,
+  Award
 } from 'lucide-react';
 import { usePlacement } from '../context/PlacementContext';
 
 export const LoginPage = () => {
   const navigate = useNavigate();
-  const { login, authSession, logout, students } = usePlacement();
+  const { 
+    login, 
+    authSession, 
+    logout, 
+    students, 
+    registerStudent, 
+    registerRecruiter 
+  } = usePlacement();
 
-  const [activeTab, setActiveTab] = useState('student'); // 'student' | 'officer' | 'company'
-  const [identifier, setIdentifier] = useState('1'); // Default to Student 1
-  const [password, setPassword] = useState('1');     // Default to Password 1
+  // Mode: 'signin' | 'register-student' | 'register-recruiter'
+  const [mode, setMode] = useState('signin');
+
+  // Sign In State
+  const [activeTab, setActiveTab] = useState('student'); // 'student' | 'company' | 'officer'
+  const [identifier, setIdentifier] = useState('student@placement.com');
+  const [password, setPassword] = useState('Student@123');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isPendingNotice, setIsPendingNotice] = useState(false);
+  const [forgotModalOpen, setForgotModalOpen] = useState(false);
+
+  // Student Registration Form State
+  const [studentForm, setStudentForm] = useState({
+    fullName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    rollNo: '',
+    department: 'Computer Science & Engineering',
+    graduationYear: '2026',
+    cgpa: ''
+  });
+  const [studentErrors, setStudentErrors] = useState({});
+
+  // Recruiter Registration Form State
+  const [recruiterForm, setRecruiterForm] = useState({
+    recruiterName: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    companyName: '',
+    website: '',
+    phone: ''
+  });
+  const [recruiterErrors, setRecruiterErrors] = useState({});
+
+  const [registrationSuccess, setRegistrationSuccess] = useState('');
 
   const tabs = [
-    { id: 'student', label: 'Student Portal',     Icon: GraduationCap, defaultId: '1',                  defaultPass: '1'        },
-    { id: 'officer', label: 'Admin / TPO Hub',    Icon: UserCheck,     defaultId: 'admin@placement.edu', defaultPass: 'admin123' },
-    { id: 'company', label: 'Recruiter Hub',      Icon: Building2,     defaultId: 'campus-hiring@google.com', defaultPass: 'hiring123' },
+    { 
+      id: 'student', 
+      label: 'Student Portal', 
+      Icon: GraduationCap, 
+      defaultId: 'student@placement.com', 
+      defaultPass: 'Student@123',
+      badge: 'Candidate Hub'
+    },
+    { 
+      id: 'company', 
+      label: 'Recruiter Hub', 
+      Icon: Building2, 
+      defaultId: 'recruiter@placement.com', 
+      defaultPass: 'Recruiter@123',
+      badge: 'Corporate Partner'
+    },
+    { 
+      id: 'officer', 
+      label: 'Admin / TPO Hub', 
+      Icon: UserCheck, 
+      defaultId: 'admin@placement.com', 
+      defaultPass: 'Admin@123',
+      badge: 'Directorate'
+    },
   ];
 
   const handleTabChange = (tab) => {
@@ -37,12 +107,32 @@ export const LoginPage = () => {
     setIdentifier(tab.defaultId);
     setPassword(tab.defaultPass);
     setError('');
+    setIsPendingNotice(false);
+  };
+
+  const handleQuickFill = (emailVal, passVal, tabId) => {
+    setActiveTab(tabId);
+    setIdentifier(emailVal);
+    setPassword(passVal);
+    setError('');
+    setIsPendingNotice(false);
   };
 
   const executeLogin = async (idToUse, passToUse) => {
     const finalId = idToUse !== undefined ? idToUse : identifier;
     const finalPass = passToUse !== undefined ? passToUse : password;
     setError('');
+    setIsPendingNotice(false);
+
+    if (!finalId.trim()) {
+      setError('Please enter your email address or Login ID.');
+      return;
+    }
+    if (!finalPass.trim()) {
+      setError('Please enter your password.');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await login(finalId, finalPass, activeTab);
@@ -50,375 +140,812 @@ export const LoginPage = () => {
       if (res && res.success) {
         navigate(res.path);
       } else {
-        setError(res?.message || 'No record found. Please enter a valid Login ID & Password.');
+        if (res?.isPending) {
+          setIsPendingNotice(true);
+        }
+        setError(res?.message || 'Invalid email or password. Please check your credentials.');
       }
     } catch {
       setLoading(false);
-      setError('Unable to authenticate with database backend.');
+      setError('Unable to authenticate. Please verify your connection.');
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleLoginSubmit = (e) => {
     e.preventDefault();
     executeLogin(identifier, password);
   };
 
-  const handleShortcutLogin = (numStr) => {
-    setIdentifier(numStr);
-    setPassword(numStr);
-    executeLogin(numStr, numStr);
+  // Student Validation
+  const validateStudentForm = () => {
+    const errs = {};
+    if (!studentForm.fullName.trim()) errs.fullName = 'Full Name is required';
+    if (!studentForm.email.trim()) {
+      errs.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(studentForm.email)) {
+      errs.email = 'Enter a valid email address';
+    }
+    if (!studentForm.password) {
+      errs.password = 'Password is required';
+    } else if (studentForm.password.length < 6) {
+      errs.password = 'Password must be at least 6 characters long';
+    }
+    if (studentForm.password !== studentForm.confirmPassword) {
+      errs.confirmPassword = 'Passwords do not match';
+    }
+    if (!studentForm.rollNo.trim()) errs.rollNo = 'Register number / Roll No is required';
+    if (!studentForm.cgpa) {
+      errs.cgpa = 'CGPA is required';
+    } else {
+      const val = parseFloat(studentForm.cgpa);
+      if (isNaN(val) || val < 0 || val > 10) {
+        errs.cgpa = 'CGPA must be between 0.00 and 10.00';
+      }
+    }
+    setStudentErrors(errs);
+    return Object.keys(errs).length === 0;
   };
 
-  // Dynamically map first 3 students from the database for shortcut login cards
-  const studentDemoCards = students.slice(0, 3).map((s, idx) => ({
-    num: s.rollNo || String(idx + 1),
-    student: s,
-    name: s.name,
-    roll: s.rollNo,
-    branch: s.branchCode,
-    cgpa: s.cgpa,
-    status: s.status,
-    statusClass: s.status === 'Placed'
-      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-400/30'
-      : 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-400/30',
-    highlights: s.placedCompany
-      ? `Placed at ${s.placedCompany} • ${s.placedPackage}`
-      : (s.skills && s.skills.length > 0 ? s.skills.slice(0, 3).join(', ') : 'Seeking Placements'),
-    avatar: s.avatar
-  }));
+  const handleStudentRegister = (e) => {
+    e.preventDefault();
+    if (!validateStudentForm()) return;
+
+    const res = registerStudent(studentForm);
+    if (res.success) {
+      setRegistrationSuccess(`Student account created for ${studentForm.fullName}! You can now log in.`);
+      setMode('signin');
+      setActiveTab('student');
+      setIdentifier(studentForm.email);
+      setPassword(studentForm.password);
+      setError('');
+    } else {
+      setStudentErrors({ general: res.message });
+    }
+  };
+
+  // Recruiter Validation
+  const validateRecruiterForm = () => {
+    const errs = {};
+    if (!recruiterForm.recruiterName.trim()) errs.recruiterName = 'Recruiter Name is required';
+    if (!recruiterForm.email.trim()) {
+      errs.email = 'Official corporate email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recruiterForm.email)) {
+      errs.email = 'Enter a valid official email address';
+    }
+    if (!recruiterForm.password) {
+      errs.password = 'Password is required';
+    } else if (recruiterForm.password.length < 6) {
+      errs.password = 'Password must be at least 6 characters';
+    }
+    if (recruiterForm.password !== recruiterForm.confirmPassword) {
+      errs.confirmPassword = 'Passwords do not match';
+    }
+    if (!recruiterForm.companyName.trim()) errs.companyName = 'Company Name is required';
+    if (!recruiterForm.website.trim()) {
+      errs.website = 'Company website is required';
+    } else if (!/^https?:\/\/.+/.test(recruiterForm.website)) {
+      errs.website = 'Website must begin with http:// or https://';
+    }
+    if (!recruiterForm.phone.trim()) {
+      errs.phone = 'Contact number is required';
+    } else if (!/^\+?[0-9\s\-()]{10,20}$/.test(recruiterForm.phone)) {
+      errs.phone = 'Enter a valid 10-digit phone number';
+    }
+    setRecruiterErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleRecruiterRegister = async (e) => {
+    e.preventDefault();
+    if (!validateRecruiterForm()) return;
+
+    const res = await registerRecruiter(recruiterForm);
+    if (res && res.success) {
+      setRegistrationSuccess('Recruiter registration submitted! Status: PENDING APPROVAL. The Placement Officer must approve your account before you can access Recruiter Hub.');
+      setMode('signin');
+      setActiveTab('company');
+      setIdentifier(recruiterForm.email);
+      setPassword(recruiterForm.password);
+      setError('');
+    } else {
+      setRecruiterErrors({ general: res?.message || 'Failed to submit recruiter registration.' });
+    }
+  };
 
   return (
     <div
       style={{ minHeight: 'calc(100vh - 80px)' }}
       className="w-full flex flex-col items-center justify-center px-4 sm:px-8 py-10 relative overflow-hidden"
     >
-      {/* Ambient background glows */}
+      {/* Background ambient lighting */}
       <div className="absolute inset-0 bg-gradient-to-br from-indigo-100/40 via-white to-sky-50/40 dark:from-[#0a0c13] dark:via-[#0f111c] dark:to-[#141526] pointer-events-none" />
-      <div className="absolute top-8 left-1/2 -translate-x-1/2 w-[900px] h-[550px] bg-gradient-to-tr from-indigo-500/20 via-purple-500/15 to-transparent rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[950px] h-[550px] bg-gradient-to-tr from-indigo-500/20 via-purple-500/15 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-      {/* Main Wide Stretched Container */}
-      <div className="relative z-10 w-full max-w-5xl flex flex-col items-center gap-6">
+      {/* Main Container */}
+      <div className="relative z-10 w-full max-w-4xl flex flex-col items-center gap-6">
 
-        {/* Security / Portal Badge */}
-        <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-700 dark:text-indigo-300 text-xs sm:text-sm font-black uppercase tracking-wider shadow-sm">
+        {/* Portal Badge */}
+        <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/25 text-indigo-700 dark:text-indigo-300 text-xs sm:text-sm font-black uppercase tracking-wider shadow-xs">
           <Sparkles className="w-4 h-4 text-indigo-500 animate-pulse" />
-          <span>PlaceIQ Centralized Campus Recruitment Portal • Live Authentication</span>
+          <span>PlaceIQ Centralized Campus Recruitment Portal • Role-Based Access Control</span>
         </div>
 
-        {/* Big Stretched Card */}
+        {/* Main Card */}
         <div className="w-full p-6 sm:p-10 md:p-12 rounded-[36px] bg-white/95 dark:bg-[#121422]/95 backdrop-blur-xl border-2 border-indigo-100 dark:border-slate-800 shadow-[0_25px_60px_-15px_rgba(99,102,241,0.2)]">
 
-          {/* Header */}
+          {/* Heading */}
           <div className="text-center max-w-2xl mx-auto">
             <h1 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white font-['Outfit'] tracking-tight">
-              Portal Sign In
+              {mode === 'signin' ? 'Portal Authentication' : mode === 'register-student' ? 'Student Registration' : 'Corporate Recruiter Registration'}
             </h1>
             <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-2 font-medium">
-              Access your personalized student placement portal, verify eligibility for campus drives, and review interview schedules
+              {mode === 'signin' 
+                ? 'Sign in to access your role-specific dashboard, recruitment drives, and interview schedules'
+                : mode === 'register-student'
+                ? 'Create your student candidate profile to apply for campus placement drives and track interview rounds'
+                : 'Register your company account to post campus recruitment drives and manage shortlisted candidates'}
             </p>
           </div>
 
-          {/* Role selector tabs - Stretched */}
-          <div className="mt-8 grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 max-w-xl mx-auto">
-            {tabs.map((tab) => {
-              const Icon = tab.Icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => handleTabChange(tab)}
-                  className={`flex items-center justify-center gap-2 py-3 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${
-                    isActive
-                      ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-md scale-102'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
+          {/* Navigation Mode Pill Switcher */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700 max-w-xl mx-auto">
+            <button
+              type="button"
+              onClick={() => { setMode('signin'); setError(''); setRegistrationSuccess(''); }}
+              className={`flex-1 min-w-[120px] py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer text-center ${
+                mode === 'signin'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-md scale-102'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('register-student'); setError(''); setRegistrationSuccess(''); }}
+              className={`flex-1 min-w-[140px] py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer text-center ${
+                mode === 'register-student'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-md scale-102'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Student Register
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('register-recruiter'); setError(''); setRegistrationSuccess(''); }}
+              className={`flex-1 min-w-[140px] py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer text-center ${
+                mode === 'register-recruiter'
+                  ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-300 shadow-md scale-102'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Recruiter Register
+            </button>
           </div>
 
-          {/* Currently Signed-in Active Banner */}
-          {authSession?.isLoggedIn && (
-            <div className="mt-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-300 dark:border-emerald-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm">
-              <div className="flex items-center gap-2.5">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
-                <span className="text-emerald-950 dark:text-emerald-200">
-                  Currently signed in as: <strong className="font-black text-emerald-700 dark:text-emerald-300">{authSession.user?.name}</strong> ({authSession.role})
-                  {authSession.user?.cgpa && ` • CGPA: ${authSession.user?.cgpa}`}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => logout()}
-                  className="px-4 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-rose-600 font-bold hover:bg-rose-50 transition cursor-pointer text-xs"
-                >
-                  Sign Out
-                </button>
-                <Link
-                  to={authSession.role === 'student' ? '/student' : authSession.role === 'officer' ? '/officer' : '/company'}
-                  className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black transition shadow-sm text-xs flex items-center gap-1.5"
-                >
-                  <span>Open {authSession.role === 'student' ? 'Student Portal' : 'Dashboard'}</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+          {/* Success Banner */}
+          {registrationSuccess && (
+            <div className="mt-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-400 dark:border-emerald-700 flex items-start gap-3 text-xs sm:text-sm animate-fade-in">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+              <div className="text-emerald-900 dark:text-emerald-200 font-semibold">
+                {registrationSuccess}
               </div>
             </div>
           )}
 
-          {/* Big Stretched 3-Student Demo Cards */}
-          {activeTab === 'student' && (
-            <div className="mt-8 space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/15 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                    <Zap className="w-4 h-4 fill-indigo-500 text-indigo-500" />
-                  </div>
-                  <div>
-                    <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-['Outfit']">
-                      Instant Student Logins (1-Click Access)
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Login as <strong>1</strong> (password <strong>1</strong>), <strong>2</strong> (password <strong>2</strong>), or <strong>3</strong> (password <strong>3</strong>)
-                    </p>
-                  </div>
-                </div>
-                <span className="hidden sm:inline-flex px-3 py-1 rounded-full bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 text-xs font-black uppercase">
-                  Click Any Card To Enter
-                </span>
-              </div>
+          {/* ========================================================================= */}
+          {/* MODE 1: SIGN IN FORM */}
+          {/* ========================================================================= */}
+          {mode === 'signin' && (
+            <div className="mt-6 space-y-6">
 
-              {/* 3 Stretched Columns */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-                {studentDemoCards.map((sc) => {
-                  const isCurrentSelected = identifier === sc.num && password === sc.num;
+              {/* Role selector tabs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 max-w-2xl mx-auto">
+                {tabs.map((tab) => {
+                  const Icon = tab.Icon;
+                  const isActive = activeTab === tab.id;
                   return (
-                    <div
-                      key={sc.num}
-                      onClick={() => handleShortcutLogin(sc.num)}
-                      className={`group relative p-5 rounded-3xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-4 ${
-                        isCurrentSelected
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xl shadow-indigo-500/30 scale-102 ring-4 ring-indigo-500/20'
-                          : 'bg-slate-50/80 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700/80 hover:border-indigo-400 hover:shadow-lg text-slate-900 dark:text-white'
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => handleTabChange(tab)}
+                      className={`flex flex-col items-center text-center p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-indigo-50/80 dark:bg-indigo-950/50 border-indigo-500 text-indigo-700 dark:text-indigo-300 shadow-md scale-102'
+                          : 'bg-white/60 dark:bg-slate-800/40 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-600'
                       }`}
                     >
-                      {/* Top Header */}
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={sc.avatar}
-                            alt={sc.name}
-                            className={`w-12 h-12 rounded-2xl object-cover border-2 shrink-0 ${
-                              isCurrentSelected ? 'border-white' : 'border-indigo-400'
-                            }`}
-                          />
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <h4 className="text-lg font-black tracking-tight">{sc.name}</h4>
-                            </div>
-                            <p className={`text-xs font-semibold ${
-                              isCurrentSelected ? 'text-indigo-100' : 'text-slate-400'
-                            }`}>
-                              {sc.branch} • Year 2026
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Credential Badge */}
-                        <div className={`px-2.5 py-1 rounded-xl text-center shrink-0 border ${
-                          isCurrentSelected
-                            ? 'bg-white/20 border-white/30 text-white'
-                            : 'bg-white dark:bg-slate-700 border-indigo-200 dark:border-slate-600 text-indigo-600 dark:text-indigo-300'
-                        }`}>
-                          <div className="text-[10px] font-black uppercase tracking-wider">Login / Pass</div>
-                          <div className="text-sm font-black">{sc.num} / {sc.num}</div>
-                        </div>
-                      </div>
-
-                      {/* Card Middle Details */}
-                      <div className={`p-3 rounded-2xl space-y-1.5 text-xs ${
-                        isCurrentSelected ? 'bg-white/10' : 'bg-white/80 dark:bg-slate-800/90 border border-slate-200/60 dark:border-slate-700'
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-1.5 ${
+                        isActive ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
                       }`}>
-                        <div className="flex items-center justify-between">
-                          <span className={isCurrentSelected ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400 font-medium'}>
-                            Academic CGPA:
-                          </span>
-                          <strong className="font-black text-sm">{sc.cgpa} / 10.0</strong>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className={isCurrentSelected ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400 font-medium'}>
-                            Status:
-                          </span>
-                          <span className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
-                            isCurrentSelected ? 'bg-white/25 text-white' : sc.statusClass
-                          }`}>
-                            {sc.status}
-                          </span>
-                        </div>
-                        <div className="pt-1 border-t border-white/10 dark:border-slate-700/60">
-                          <span className={isCurrentSelected ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400 font-medium block'}>
-                            Featured Drives:
-                          </span>
-                          <span className="font-bold block truncate">{sc.highlights}</span>
-                        </div>
+                        <Icon className="w-5 h-5" />
                       </div>
-
-                      {/* Card Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleShortcutLogin(sc.num);
-                        }}
-                        className={`w-full py-2.5 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-xs ${
-                          isCurrentSelected
-                            ? 'bg-white text-indigo-700 hover:bg-indigo-50'
-                            : 'bg-indigo-600 text-white hover:bg-indigo-700'
-                        }`}
-                      >
-                        <span>1-Click Sign In as {sc.name}</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                      <span className="text-xs sm:text-sm font-black">{tab.label}</span>
+                      <span className="text-[10px] font-bold text-slate-400 mt-0.5">{tab.badge}</span>
+                    </button>
                   );
                 })}
               </div>
+
+              {/* Currently Signed In Identity */}
+              {authSession?.isLoggedIn && (
+                <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-sm">
+                  <div className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-5 h-5 text-indigo-600 shrink-0" />
+                    <span className="text-slate-800 dark:text-slate-200">
+                      Active Session: <strong className="font-black text-indigo-600 dark:text-indigo-400">{authSession.user?.name}</strong> ({authSession.role})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => navigate(authSession.role === 'student' ? '/student' : authSession.role === 'company' ? '/company' : '/officer')}
+                      className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black shadow-xs"
+                    >
+                      Enter Dashboard →
+                    </button>
+                    <button
+                      type="button"
+                      onClick={logout}
+                      className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-700 hover:bg-rose-50 text-slate-700 hover:text-rose-600 text-xs font-bold border border-slate-200 dark:border-slate-600"
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Message Box */}
+              {error && (
+                <div className={`p-4 rounded-2xl flex items-start gap-3 text-xs sm:text-sm border-2 animate-shake ${
+                  isPendingNotice 
+                    ? 'bg-amber-50 dark:bg-amber-950/50 border-amber-400 text-amber-900 dark:text-amber-200' 
+                    : 'bg-rose-50 dark:bg-rose-950/50 border-rose-400 text-rose-900 dark:text-rose-200'
+                }`}>
+                  <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${isPendingNotice ? 'text-amber-600' : 'text-rose-600'}`} />
+                  <div>
+                    <div className="font-black">{isPendingNotice ? 'Recruiter Account Pending Approval' : 'Authentication Failed'}</div>
+                    <div className="mt-0.5 font-medium">{error}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Login Form */}
+              <form onSubmit={handleLoginSubmit} className="max-w-xl mx-auto space-y-4">
+                
+                {/* Email or Identifier Input */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5">
+                    {activeTab === 'student' ? 'Student Email / Roll Number' : activeTab === 'company' ? 'Corporate Recruiter Email' : 'Placement Officer Email'}
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Mail className="w-5 h-5" />
+                    </div>
+                    <input
+                      type="text"
+                      value={identifier}
+                      onChange={(e) => { setIdentifier(e.target.value); setError(''); }}
+                      placeholder={activeTab === 'student' ? 'student@placement.com or 1' : activeTab === 'company' ? 'recruiter@placement.com' : 'admin@placement.com'}
+                      required
+                      className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Password Input with Show/Hide toggle */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setForgotModalOpen(true)}
+                      className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                      <Lock className="w-5 h-5" />
+                    </div>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => { setPassword(e.target.value); setError(''); }}
+                      placeholder="Enter account password"
+                      required
+                      className="w-full pl-11 pr-11 py-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Remember Me Checkbox */}
+                <div className="flex items-center justify-between pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 dark:border-slate-700"
+                    />
+                    <span>Remember this device</span>
+                  </label>
+                </div>
+
+                {/* Submit Sign In Button */}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 rounded-2xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-[#7d5fff] hover:opacity-95 text-white font-black text-base shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer transition-all disabled:opacity-50 mt-2"
+                >
+                  {loading ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <span>Sign In to {activeTab === 'student' ? 'Student Portal' : activeTab === 'company' ? 'Recruiter Hub' : 'Admin Hub'}</span>
+                      <ArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* DEMO ACCOUNTS QUICK-FILL SECTION (Requirement 8) */}
+              <div className="pt-6 border-t border-slate-200 dark:border-slate-800">
+                <div className="text-center mb-3">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-400 px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800">
+                    One-Click Demo Test Accounts
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  
+                  {/* Student Demo Account */}
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFill('student@placement.com', 'Student@123', 'student')}
+                    className="p-3.5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800/60 text-left hover:scale-102 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                        <GraduationCap className="w-4 h-4" />
+                        Student Demo
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-300">
+                        Candidate
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs font-mono text-slate-700 dark:text-slate-300 truncate">
+                      student@placement.com
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-400">
+                      Pass: Student@123
+                    </div>
+                  </button>
+
+                  {/* Recruiter Demo Account */}
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFill('recruiter@placement.com', 'Recruiter@123', 'company')}
+                    className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60 text-left hover:scale-102 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-emerald-700 dark:text-emerald-300 flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4" />
+                        Recruiter Demo
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900 text-emerald-600 dark:text-emerald-300">
+                        Approved
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs font-mono text-slate-700 dark:text-slate-300 truncate">
+                      recruiter@placement.com
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-400">
+                      Pass: Recruiter@123
+                    </div>
+                  </button>
+
+                  {/* Admin Demo Account */}
+                  <button
+                    type="button"
+                    onClick={() => handleQuickFill('admin@placement.com', 'Admin@123', 'officer')}
+                    className="p-3.5 rounded-2xl bg-purple-50/60 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800/60 text-left hover:scale-102 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
+                        <UserCheck className="w-4 h-4" />
+                        Admin Demo
+                      </span>
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300">
+                        Directorate
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs font-mono text-slate-700 dark:text-slate-300 truncate">
+                      admin@placement.com
+                    </div>
+                    <div className="text-[11px] font-mono text-slate-400">
+                      Pass: Admin@123
+                    </div>
+                  </button>
+                </div>
+              </div>
+
             </div>
           )}
 
-          {/* Form Divider */}
-          <div className="my-8 flex items-center gap-4">
-            <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 px-2">
-              {activeTab === 'student' ? 'Or Enter Login & Password Manually' : 'Institutional Credentials'}
-            </span>
-            <div className="h-px bg-slate-200 dark:bg-slate-700 flex-1" />
-          </div>
+          {/* ========================================================================= */}
+          {/* MODE 2: STUDENT REGISTRATION FORM (Requirement 7) */}
+          {/* ========================================================================= */}
+          {mode === 'register-student' && (
+            <form onSubmit={handleStudentRegister} className="mt-6 space-y-4 max-w-2xl mx-auto">
+              
+              {studentErrors.general && (
+                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 text-rose-700 dark:text-rose-300 text-xs font-bold">
+                  {studentErrors.general}
+                </div>
+              )}
 
-          {/* Form - Stretched Grid */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Identifier Input */}
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5 ml-1">
-                  {activeTab === 'student'
-                    ? 'Student Login ID / Name (Enter 1, 2, or 3)'
-                    : 'Institutional Email Address'}
-                </label>
-                <div className="relative">
-                  {activeTab === 'student' ? (
-                    <GraduationCap className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  ) : (
-                    <Mail className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                  )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Full Name */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Full Name *
+                  </label>
                   <input
                     type="text"
-                    required
-                    value={identifier}
-                    onChange={(e) => { setIdentifier(e.target.value); setError(''); }}
-                    placeholder={
-                      activeTab === 'student'
-                        ? 'Enter 1, 2, or 3'
-                        : activeTab === 'officer'
-                          ? 'admin@placement.edu'
-                          : 'campus-hiring@google.com'
-                    }
-                    className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm sm:text-base focus:outline-none focus:border-indigo-500 shadow-sm"
+                    value={studentForm.fullName}
+                    onChange={(e) => setStudentForm({ ...studentForm, fullName: e.target.value })}
+                    placeholder="e.g. Rahul Sharma"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      studentErrors.fullName ? 'border-rose-400 focus:ring-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
                   />
+                  {studentErrors.fullName && <p className="text-xs text-rose-500 mt-1 font-semibold">{studentErrors.fullName}</p>}
                 </div>
-              </div>
 
-              {/* Password Input */}
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-300 mb-1.5 ml-1">
-                  {activeTab === 'student'
-                    ? 'Password (1 for Student 1, 2 for Student 2, 3 for Student 3)'
-                    : 'Security Password'}
-                </label>
-                <div className="relative">
-                  <Lock className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                {/* Email Address */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Email Address *
+                  </label>
+                  <input
+                    type="email"
+                    value={studentForm.email}
+                    onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
+                    placeholder="student@campus.edu"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      studentErrors.email ? 'border-rose-400 focus:ring-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {studentErrors.email && <p className="text-xs text-rose-500 mt-1 font-semibold">{studentErrors.email}</p>}
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Password * (Min 6 chars)
+                  </label>
                   <input
                     type="password"
-                    required
-                    value={password}
-                    onChange={(e) => { setPassword(e.target.value); setError(''); }}
-                    placeholder={activeTab === 'student' ? 'Enter 1, 2, or 3' : '••••••••'}
-                    className="w-full pl-12 pr-4 py-3.5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-bold text-sm sm:text-base focus:outline-none focus:border-indigo-500 shadow-sm"
+                    value={studentForm.password}
+                    onChange={(e) => setStudentForm({ ...studentForm, password: e.target.value })}
+                    placeholder="Create secure password"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      studentErrors.password ? 'border-rose-400 focus:ring-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
                   />
+                  {studentErrors.password && <p className="text-xs text-rose-500 mt-1 font-semibold">{studentErrors.password}</p>}
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Confirm Password *
+                  </label>
+                  <input
+                    type="password"
+                    value={studentForm.confirmPassword}
+                    onChange={(e) => setStudentForm({ ...studentForm, confirmPassword: e.target.value })}
+                    placeholder="Re-enter password"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      studentErrors.confirmPassword ? 'border-rose-400 focus:ring-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {studentErrors.confirmPassword && <p className="text-xs text-rose-500 mt-1 font-semibold">{studentErrors.confirmPassword}</p>}
+                </div>
+
+                {/* Roll / Register Number */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Register Number / Roll No *
+                  </label>
+                  <input
+                    type="text"
+                    value={studentForm.rollNo}
+                    onChange={(e) => setStudentForm({ ...studentForm, rollNo: e.target.value })}
+                    placeholder="e.g. 2022CS1050"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      studentErrors.rollNo ? 'border-rose-400 focus:ring-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {studentErrors.rollNo && <p className="text-xs text-rose-500 mt-1 font-semibold">{studentErrors.rollNo}</p>}
+                </div>
+
+                {/* Department */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Department / Branch *
+                  </label>
+                  <select
+                    value={studentForm.department}
+                    onChange={(e) => setStudentForm({ ...studentForm, department: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-sm font-medium"
+                  >
+                    <option value="Computer Science & Engineering">Computer Science & Engineering (CSE)</option>
+                    <option value="Electronics & Communication">Electronics & Communication (ECE)</option>
+                    <option value="Information Technology">Information Technology (IT)</option>
+                    <option value="Mechanical Engineering">Mechanical Engineering (MECH)</option>
+                    <option value="Civil Engineering">Civil Engineering (CIVIL)</option>
+                    <option value="Electrical Engineering">Electrical Engineering (EEE)</option>
+                    <option value="AI & Data Science">AI & Data Science (AIDS)</option>
+                  </select>
+                </div>
+
+                {/* Graduation Year */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Graduation Year *
+                  </label>
+                  <select
+                    value={studentForm.graduationYear}
+                    onChange={(e) => setStudentForm({ ...studentForm, graduationYear: e.target.value })}
+                    className="w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border border-slate-200 dark:border-slate-700 text-sm font-medium"
+                  >
+                    <option value="2025">Class of 2025</option>
+                    <option value="2026">Class of 2026 (Current Batch)</option>
+                    <option value="2027">Class of 2027</option>
+                    <option value="2028">Class of 2028</option>
+                  </select>
+                </div>
+
+                {/* CGPA */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Current CGPA * (0.00 - 10.00)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="10"
+                    value={studentForm.cgpa}
+                    onChange={(e) => setStudentForm({ ...studentForm, cgpa: e.target.value })}
+                    placeholder="e.g. 8.75"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      studentErrors.cgpa ? 'border-rose-400 focus:ring-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {studentErrors.cgpa && <p className="text-xs text-rose-500 mt-1 font-semibold">{studentErrors.cgpa}</p>}
                 </div>
               </div>
-            </div>
 
-            {error && (
-              <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 dark:border-rose-800 text-xs sm:text-sm font-bold text-rose-600 dark:text-rose-400">
-                {error}
+              <button
+                type="submit"
+                className="w-full mt-4 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-base shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                <span>Register as Student & Access Placement Drives</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </form>
+          )}
+
+          {/* ========================================================================= */}
+          {/* MODE 3: RECRUITER REGISTRATION FORM (Requirement 7) */}
+          {/* ========================================================================= */}
+          {mode === 'register-recruiter' && (
+            <form onSubmit={handleRecruiterRegister} className="mt-6 space-y-4 max-w-2xl mx-auto">
+              
+              {/* Approval Notice */}
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 text-xs sm:text-sm text-amber-900 dark:text-amber-200 flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-black">Administrative Approval Required:</strong>
+                  <p className="mt-0.5">
+                    Newly registered corporate recruiter accounts receive a <strong>Pending Approval</strong> status. You will not be granted access to the Recruiter Hub until verified and approved by the Placement Officer / Admin.
+                  </p>
+                </div>
               </div>
-            )}
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 rounded-2xl font-black text-base text-white bg-gradient-to-r from-indigo-600 via-[#7048e8] to-[#8c52ff] hover:opacity-95 transition-all shadow-xl shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer hover:scale-[1.005] active:scale-[0.995] disabled:opacity-70"
-            >
-              {loading ? (
-                <span>Authenticating Credentials…</span>
-              ) : (
-                <>
-                  <span>
-                    {activeTab === 'student'
-                      ? (identifier === '1'
-                          ? 'Sign In as Student 1 (Login: 1 • Password: 1)'
-                          : identifier === '2'
-                            ? 'Sign In as Student 2 (Login: 2 • Password: 2)'
-                            : identifier === '3'
-                              ? 'Sign In as Student 3 (Login: 3 • Password: 3)'
-                              : `Sign In as Student (${identifier})`)
-                      : activeTab === 'officer'
-                        ? 'Sign In to Placement Directorate Admin'
-                        : 'Sign In to Recruiter Hub'}
-                  </span>
-                  <ArrowRight className="w-5 h-5" />
-                </>
+              {recruiterErrors.general && (
+                <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-300 text-rose-700 dark:text-rose-300 text-xs font-bold">
+                  {recruiterErrors.general}
+                </div>
               )}
-            </button>
-          </form>
 
-          {/* Admin Hint */}
-          {activeTab === 'officer' && (
-            <div className="mt-6 p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-center text-xs sm:text-sm text-slate-600 dark:text-slate-300 border border-indigo-200 dark:border-indigo-800">
-              <span className="font-bold">Directorate Access:</span> Use institutional username <strong className="text-indigo-600 dark:text-indigo-400">admin@placement.edu</strong> with any password.
-            </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Recruiter Full Name */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Recruiter Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={recruiterForm.recruiterName}
+                    onChange={(e) => setRecruiterForm({ ...recruiterForm, recruiterName: e.target.value })}
+                    placeholder="e.g. Sarah Jenkins"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      recruiterErrors.recruiterName ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {recruiterErrors.recruiterName && <p className="text-xs text-rose-500 mt-1 font-semibold">{recruiterErrors.recruiterName}</p>}
+                </div>
+
+                {/* Official Corporate Email */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Official Corporate Email *
+                  </label>
+                  <input
+                    type="email"
+                    value={recruiterForm.email}
+                    onChange={(e) => setRecruiterForm({ ...recruiterForm, email: e.target.value })}
+                    placeholder="recruiter@company.com"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      recruiterErrors.email ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {recruiterErrors.email && <p className="text-xs text-rose-500 mt-1 font-semibold">{recruiterErrors.email}</p>}
+                </div>
+
+                {/* Password */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Password * (Min 6 chars)
+                  </label>
+                  <input
+                    type="password"
+                    value={recruiterForm.password}
+                    onChange={(e) => setRecruiterForm({ ...recruiterForm, password: e.target.value })}
+                    placeholder="Create recruiter password"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      recruiterErrors.password ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {recruiterErrors.password && <p className="text-xs text-rose-500 mt-1 font-semibold">{recruiterErrors.password}</p>}
+                </div>
+
+                {/* Confirm Password */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Confirm Password *
+                  </label>
+                  <input
+                    type="password"
+                    value={recruiterForm.confirmPassword}
+                    onChange={(e) => setRecruiterForm({ ...recruiterForm, confirmPassword: e.target.value })}
+                    placeholder="Re-enter password"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      recruiterErrors.confirmPassword ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {recruiterErrors.confirmPassword && <p className="text-xs text-rose-500 mt-1 font-semibold">{recruiterErrors.confirmPassword}</p>}
+                </div>
+
+                {/* Company Name */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Company Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={recruiterForm.companyName}
+                    onChange={(e) => setRecruiterForm({ ...recruiterForm, companyName: e.target.value })}
+                    placeholder="e.g. Apex Global Tech"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      recruiterErrors.companyName ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {recruiterErrors.companyName && <p className="text-xs text-rose-500 mt-1 font-semibold">{recruiterErrors.companyName}</p>}
+                </div>
+
+                {/* Company Website */}
+                <div>
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Company Website * (https://...)
+                  </label>
+                  <input
+                    type="url"
+                    value={recruiterForm.website}
+                    onChange={(e) => setRecruiterForm({ ...recruiterForm, website: e.target.value })}
+                    placeholder="https://company.com"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      recruiterErrors.website ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {recruiterErrors.website && <p className="text-xs text-rose-500 mt-1 font-semibold">{recruiterErrors.website}</p>}
+                </div>
+
+                {/* Contact Phone */}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                    Recruitment Contact Phone Number *
+                  </label>
+                  <input
+                    type="tel"
+                    value={recruiterForm.phone}
+                    onChange={(e) => setRecruiterForm({ ...recruiterForm, phone: e.target.value })}
+                    placeholder="+91 98765 43210"
+                    className={`w-full px-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800/90 border text-sm font-medium ${
+                      recruiterErrors.phone ? 'border-rose-400' : 'border-slate-200 dark:border-slate-700'
+                    }`}
+                  />
+                  {recruiterErrors.phone && <p className="text-xs text-rose-500 mt-1 font-semibold">{recruiterErrors.phone}</p>}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full mt-4 py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-base shadow-xl shadow-emerald-500/25 flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                <span>Submit Recruiter Registration (Pending Verification)</span>
+                <ArrowRight className="w-5 h-5" />
+              </button>
+            </form>
           )}
 
-          {/* Recruiter Hint */}
-          {activeTab === 'company' && (
-            <div className="mt-6 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-center text-xs sm:text-sm text-slate-600 dark:text-slate-300 border border-emerald-200 dark:border-emerald-800">
-              <span className="font-bold">Recruiter Access:</span> Use corporate account <strong className="text-emerald-600 dark:text-emerald-400">campus-hiring@google.com</strong> with any password.
-            </div>
-          )}
-
-          {/* Back link */}
-          <div className="mt-8 text-center">
-            <Link
-              to="/"
-              className="text-xs sm:text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
-            >
-              ← Back to Campus Placement Portal Overview
-            </Link>
-          </div>
         </div>
 
-        {/* Footer Subtext */}
-        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium text-center">
-          PlaceIQ System Credentials: <strong>Student 1</strong> (1 / 1) • <strong>Student 2</strong> (2 / 2) • <strong>Student 3</strong> (3 / 3) • <strong>Admin</strong> (admin@placement.edu)
-        </p>
+        {/* Security & Architecture Footer */}
+        <div className="text-center text-xs text-slate-400 font-medium max-w-lg">
+          Protected by PlaceIQ Role-Based Access Control System. LocalStorage persistence enabled for demo environment.
+        </div>
 
       </div>
+
+      {/* Forgot Password Modal */}
+      {forgotModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl relative">
+            <button
+              onClick={() => setForgotModalOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <div className="w-12 h-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-4">
+              <HelpCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-black text-slate-900 dark:text-white">Account Password Recovery</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+              In this environment, you can use the pre-configured demo credentials or reset your password through the Placement Directorate.
+            </p>
+            <div className="mt-4 p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 text-xs space-y-2 font-mono">
+              <div><strong>Admin:</strong> admin@placement.com / Admin@123</div>
+              <div><strong>Student:</strong> student@placement.com / Student@123</div>
+              <div><strong>Recruiter:</strong> recruiter@placement.com / Recruiter@123</div>
+            </div>
+            <button
+              onClick={() => setForgotModalOpen(false)}
+              className="w-full mt-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black"
+            >
+              Got it, Return to Login
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -49,8 +49,11 @@ export const Navbar = () => {
     <header className="sticky top-0 z-50 px-4 sm:px-8 py-3 transition-colors duration-200 backdrop-blur-md bg-white/90 dark:bg-[#0f111a]/95 border-b border-slate-200/80 dark:border-slate-800">
       <div className="w-full flex items-center justify-between gap-4">
         
-        {/* Brand Logo */}
-        <Link to="/" className="flex items-center gap-3 group">
+        {/* Brand Logo - links to role's dashboard if logged in, or /login */}
+        <Link 
+          to={authSession?.isLoggedIn ? (authSession.role === 'student' ? '/student' : authSession.role === 'company' ? '/company' : '/officer') : '/login'} 
+          className="flex items-center gap-3 group"
+        >
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#6c5ce7] via-[#7d5fff] to-[#a29bfe] flex items-center justify-center shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition-transform duration-300">
             <GraduationCap className="w-6 h-6 text-white" />
           </div>
@@ -65,88 +68,105 @@ export const Navbar = () => {
           </div>
         </Link>
 
-        {/* Center Nav Links - Role-aware */}
-        <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100/90 dark:bg-slate-900/90 p-1.5 rounded-full border border-slate-200/80 dark:border-slate-800 shadow-inner">
-          <Link
-            to="/"
-            className={`px-5 py-2.5 text-base font-extrabold rounded-full transition-all duration-200 ${
-              isActive('/') 
-                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' 
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            Home
-          </Link>
-          
-          {/* TPO Directorate - ONLY for verified Admin */}
-          {authSession?.isLoggedIn && authSession?.role === 'officer' && (
-            <Link
-              to="/officer"
-              className={`px-5 py-2.5 text-base font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
-                isActive('/officer') 
-                  ? 'bg-[#6c5ce7] text-white shadow-md shadow-indigo-500/25' 
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <UserCheck className="w-4 h-4" />
-              TPO Directorate
-            </Link>
-          )}
+        {/* Center Nav Links - STRICT ROLE SEPARATION */}
+        {authSession?.isLoggedIn && (
+          <nav className="hidden lg:flex items-center gap-1.5 bg-slate-100/90 dark:bg-slate-900/90 p-1.5 rounded-full border border-slate-200/80 dark:border-slate-800 shadow-inner">
+            
+            {/* Student Navigation: Dashboard, Active Drives, Results */}
+            {authSession.role === 'student' && (
+              <>
+                <Link
+                  to="/student"
+                  className={`px-5 py-2.5 text-sm font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
+                    isActive('/student') 
+                      ? 'bg-[#6c5ce7] text-white shadow-md shadow-indigo-500/25' 
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <GraduationCap className="w-4 h-4" />
+                  Student Dashboard
+                </Link>
+                <Link
+                  to="/jobs"
+                  className={`px-5 py-2.5 text-sm font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
+                    isActive('/jobs') 
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs' 
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  Eligible Drives
+                </Link>
+                <Link
+                  to="/results"
+                  className={`px-5 py-2.5 text-sm font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
+                    isActive('/results') 
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs' 
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Award className="w-4 h-4" />
+                  Results
+                </Link>
+              </>
+            )}
 
-          {/* Student Portal - ONLY for logged-in students */}
-          {authSession?.isLoggedIn && authSession?.role === 'student' && (
-            <Link
-              to="/student"
-              className={`px-5 py-2.5 text-base font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
-                isActive('/student') 
-                  ? 'bg-[#6c5ce7] text-white shadow-md shadow-indigo-500/25' 
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <GraduationCap className="w-4 h-4" />
-              Student Portal
-            </Link>
-          )}
+            {/* Recruiter Navigation: Recruiter Hub ONLY (NO student links) */}
+            {authSession.role === 'company' && (
+              <Link
+                to="/company"
+                className={`px-5 py-2.5 text-sm font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
+                  isActive('/company') 
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/25' 
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                Recruiter Hub
+              </Link>
+            )}
 
-          {/* Recruiter Hub - ONLY for logged-in companies */}
-          {authSession?.isLoggedIn && authSession?.role === 'company' && (
-            <Link
-              to="/company"
-              className={`px-5 py-2.5 text-base font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
-                isActive('/company') 
-                  ? 'bg-[#6c5ce7] text-white shadow-md shadow-indigo-500/25' 
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              }`}
-            >
-              <Building2 className="w-4 h-4" />
-              Recruiter Hub
-            </Link>
-          )}
+            {/* Placement Officer / Admin Navigation */}
+            {authSession.role === 'officer' && (
+              <>
+                <Link
+                  to="/officer"
+                  className={`px-5 py-2.5 text-sm font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
+                    isActive('/officer') 
+                      ? 'bg-[#6c5ce7] text-white shadow-md shadow-indigo-500/25' 
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <UserCheck className="w-4 h-4" />
+                  Admin Dashboard
+                </Link>
+                <Link
+                  to="/jobs"
+                  className={`px-5 py-2.5 text-sm font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
+                    isActive('/jobs') 
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs' 
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  Drive Listings
+                </Link>
+                <Link
+                  to="/results"
+                  className={`px-5 py-2.5 text-sm font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
+                    isActive('/results') 
+                      ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs' 
+                      : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                  }`}
+                >
+                  <Award className="w-4 h-4" />
+                  Placement Results
+                </Link>
+              </>
+            )}
 
-          <Link
-            to="/jobs"
-            className={`px-5 py-2.5 text-base font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
-              isActive('/jobs') 
-                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' 
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Briefcase className="w-4 h-4" />
-            Active Drives
-          </Link>
-
-          <Link
-            to="/results"
-            className={`px-5 py-2.5 text-base font-extrabold rounded-full transition-all duration-200 flex items-center gap-2 ${
-              isActive('/results') 
-                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm' 
-                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-            }`}
-          >
-            <Award className="w-4 h-4" />
-            Results
-          </Link>
-        </nav>
+          </nav>
+        )}
 
         {/* Right Action Tools: Role Switcher, Notifications, Dark Mode & Reset */}
         <div className="flex items-center gap-2 sm:gap-3">
@@ -205,16 +225,6 @@ export const Navbar = () => {
                   </div>
                 </div>
               )}
-
-              {/* Switch Account link */}
-              <Link
-                to="/login"
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950 hover:bg-indigo-100 text-indigo-600 dark:text-indigo-300 text-xs font-black transition-all border border-indigo-200 dark:border-indigo-800"
-                title="Switch between Student 1, Student 2, or Admin"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Switch Account</span>
-              </Link>
 
               {/* Sign Out Button */}
               <button
@@ -289,37 +299,38 @@ export const Navbar = () => {
             {darkMode ? <Sun className="w-5 h-5 text-amber-400" /> : <Moon className="w-5 h-5" />}
           </button>
 
-          {/* Sync Live Registry Button */}
-          <button
-            onClick={resetToDemoData}
-            className="hidden lg:flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-bold bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors border border-indigo-200 dark:border-indigo-900"
-            title="Synchronize registry records"
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>Sync Data</span>
-          </button>
         </div>
 
       </div>
 
-      {/* Mobile subnavigation bar - role-aware */}
-      <div className="flex md:hidden overflow-x-auto gap-2.5 pt-3 pb-1.5 no-scrollbar border-t border-slate-100 dark:border-slate-800/80 mt-2">
-        <Link to="/" className={`px-4 py-2 rounded-2xl text-sm font-black whitespace-nowrap transition-all ${isActive('/') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Home</Link>
-        {authSession?.isLoggedIn && authSession?.role === 'officer' && (
-          <Link to="/officer" className={`px-4 py-2 rounded-2xl text-sm font-black whitespace-nowrap transition-all ${isActive('/officer') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>TPO Directorate</Link>
-        )}
-        {authSession?.isLoggedIn && authSession?.role === 'student' && (
-          <Link to="/student" className={`px-4 py-2 rounded-2xl text-sm font-black whitespace-nowrap transition-all ${isActive('/student') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Student Portal</Link>
-        )}
-        {authSession?.isLoggedIn && authSession?.role === 'company' && (
-          <Link to="/company" className={`px-4 py-2 rounded-2xl text-sm font-black whitespace-nowrap transition-all ${isActive('/company') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Recruiter Hub</Link>
-        )}
-        <Link to="/jobs" className={`px-4 py-2 rounded-2xl text-sm font-black whitespace-nowrap transition-all ${isActive('/jobs') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Job Drives</Link>
-        <Link to="/results" className={`px-4 py-2 rounded-2xl text-sm font-black whitespace-nowrap transition-all ${isActive('/results') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Results</Link>
-        {!authSession?.isLoggedIn && (
-          <Link to="/login" className={`px-4 py-2 rounded-2xl text-sm font-black whitespace-nowrap transition-all ${isActive('/login') ? 'bg-indigo-600 text-white shadow-md' : 'text-indigo-600 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950'}`}>Sign In</Link>
-        )}
-      </div>
+      {/* Mobile subnavigation bar - strictly role-aware */}
+      {authSession?.isLoggedIn ? (
+        <div className="flex md:hidden overflow-x-auto gap-2.5 pt-3 pb-1.5 no-scrollbar border-t border-slate-100 dark:border-slate-800/80 mt-2">
+          {authSession.role === 'student' && (
+            <>
+              <Link to="/student" className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition-all ${isActive('/student') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Student Dashboard</Link>
+              <Link to="/jobs" className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition-all ${isActive('/jobs') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Eligible Drives</Link>
+              <Link to="/results" className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition-all ${isActive('/results') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Results</Link>
+            </>
+          )}
+          {authSession.role === 'company' && (
+            <Link to="/company" className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition-all ${isActive('/company') ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Recruiter Hub</Link>
+          )}
+          {authSession.role === 'officer' && (
+            <>
+              <Link to="/officer" className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition-all ${isActive('/officer') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Admin Dashboard</Link>
+              <Link to="/jobs" className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition-all ${isActive('/jobs') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Job Drives</Link>
+              <Link to="/results" className={`px-4 py-2 rounded-2xl text-xs font-black whitespace-nowrap transition-all ${isActive('/results') ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'}`}>Results</Link>
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="flex md:hidden items-center justify-center pt-2 pb-1 border-t border-slate-100 dark:border-slate-800/80 mt-2">
+          <Link to="/login" className="px-5 py-2 rounded-xl text-xs font-black bg-indigo-600 text-white shadow-md">
+            Sign In to Placement Portal
+          </Link>
+        </div>
+      )}
     </header>
   );
 };

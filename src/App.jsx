@@ -40,19 +40,53 @@ const ToastNotification = () => {
   );
 };
 
-// Guard: redirects to /login if user is not logged in with the required role
+// Root redirect: Login is the first screen for unauthenticated users, or redirects to role dashboard
+const RootRoute = () => {
+  const { authSession } = usePlacement();
+  if (!authSession?.isLoggedIn) {
+    return <Navigate to="/login" replace />;
+  }
+  if (authSession.role === 'student') return <Navigate to="/student" replace />;
+  if (authSession.role === 'company') return <Navigate to="/company" replace />;
+  if (authSession.role === 'officer') return <Navigate to="/officer" replace />;
+  return <Navigate to="/login" replace />;
+};
+
+// Login Route: If already authenticated, redirect to respective role dashboard
+const LoginRoute = () => {
+  const { authSession } = usePlacement();
+  if (authSession?.isLoggedIn) {
+    if (authSession.role === 'student') return <Navigate to="/student" replace />;
+    if (authSession.role === 'company') return <Navigate to="/company" replace />;
+    if (authSession.role === 'officer') return <Navigate to="/officer" replace />;
+  }
+  return <LoginPage />;
+};
+
+// Strict Role Guard: Redirects to /login if unauthenticated, or to own dashboard if wrong role
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { authSession } = usePlacement();
   if (!authSession?.isLoggedIn) {
     return <Navigate to="/login" replace />;
   }
   if (requiredRole && authSession.role !== requiredRole) {
-    // Wrong role — send them to their own dashboard or login
     const roleRedirect = authSession.role === 'student' ? '/student'
-      : authSession.role === 'officer' ? '/officer'
       : authSession.role === 'company' ? '/company'
+      : authSession.role === 'officer' ? '/officer'
       : '/login';
     return <Navigate to={roleRedirect} replace />;
+  }
+  return children;
+};
+
+// Student/Admin Only Pages (Recruiters are strictly blocked from student job browsing)
+const StudentOrAdminRoute = ({ children }) => {
+  const { authSession } = usePlacement();
+  if (!authSession?.isLoggedIn) {
+    return <Navigate to="/login" replace />;
+  }
+  if (authSession.role === 'company') {
+    return <Navigate to="/company" replace />;
   }
   return children;
 };
@@ -63,25 +97,59 @@ const AppLayout = () => {
       <Navbar />
       <main className="flex-1">
         <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/login" element={<LoginPage />} />
+          {/* First screen: Login if not logged in, or respective dashboard */}
+          <Route path="/" element={<RootRoute />} />
+          <Route path="/login" element={<LoginRoute />} />
+
+          {/* Student Dashboard & Sub-routes */}
           <Route path="/student" element={
             <ProtectedRoute requiredRole="student">
               <StudentDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/student/*" element={
+            <ProtectedRoute requiredRole="student">
+              <StudentDashboard />
+            </ProtectedRoute>
+          } />
+
+          {/* Placement Officer / Admin Dashboard */}
           <Route path="/officer" element={
             <ProtectedRoute requiredRole="officer">
               <OfficerDashboard />
             </ProtectedRoute>
           } />
+          <Route path="/officer/*" element={
+            <ProtectedRoute requiredRole="officer">
+              <OfficerDashboard />
+            </ProtectedRoute>
+          } />
+
+          {/* Recruiter Hub: ONLY accessible to authenticated Recruiter accounts */}
           <Route path="/company" element={
             <ProtectedRoute requiredRole="company">
               <CompanyDashboard />
             </ProtectedRoute>
           } />
-          <Route path="/jobs" element={<JobsPage />} />
-          <Route path="/results" element={<ResultsPage />} />
+          <Route path="/company/*" element={
+            <ProtectedRoute requiredRole="company">
+              <CompanyDashboard />
+            </ProtectedRoute>
+          } />
+
+          {/* Job Drives & Results: Accessible to Students and Admin; Recruiters redirected to /company */}
+          <Route path="/jobs" element={
+            <StudentOrAdminRoute>
+              <JobsPage />
+            </StudentOrAdminRoute>
+          } />
+          <Route path="/results" element={
+            <StudentOrAdminRoute>
+              <ResultsPage />
+            </StudentOrAdminRoute>
+          } />
+
+          {/* Catch-all redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>

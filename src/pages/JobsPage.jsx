@@ -13,7 +13,8 @@ import {
   ArrowRight,
   Sparkles,
   Info,
-  GraduationCap
+  GraduationCap,
+  XCircle
 } from 'lucide-react';
 import { usePlacement } from '../context/PlacementContext';
 import { EligibilityBadge } from '../components/EligibilityBadge';
@@ -270,15 +271,31 @@ export const JobsPage = () => {
 
                 {already ? (
                   <ApplicationStatusBadge status={appliedRecord?.status} />
-                ) : (
-                  <button
-                    onClick={() => handleApply(job)}
-                    className="px-6 py-3 rounded-2xl font-black text-sm sm:text-base flex items-center gap-2 transition-all bg-[#6c5ce7] hover:bg-[#5b4bc4] text-white shadow-lg shadow-indigo-500/25 hover:scale-105 active:scale-95 cursor-pointer"
-                  >
-                    <span>Apply Now</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                )}
+                ) : (() => {
+                  const eligible = !isStudentLoggedIn || checkEligibility(currentStudent, job).meetsRequirements;
+                  return eligible ? (
+                    <button
+                      onClick={() => handleApply(job)}
+                      className="px-6 py-3 rounded-2xl font-black text-sm sm:text-base flex items-center gap-2 transition-all bg-[#6c5ce7] hover:bg-[#5b4bc4] text-white shadow-lg shadow-indigo-500/25 hover:scale-105 active:scale-95 cursor-pointer"
+                    >
+                      <span>Apply Now</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <div className="relative group">
+                      <button
+                        disabled
+                        className="px-6 py-3 rounded-2xl font-black text-sm sm:text-base flex items-center gap-2 bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed select-none border border-slate-300 dark:border-slate-700"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        <span>Not Eligible</span>
+                      </button>
+                      <div className="absolute bottom-full right-0 mb-2 w-56 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                        Your CGPA ({currentStudent?.cgpa}) is below the minimum required ({job.minCgpa}) for this role.
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
             </div>

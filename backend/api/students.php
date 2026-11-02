@@ -76,8 +76,9 @@ if ($method === 'POST') {
     $education10th = isset($input['education10th']) ? (is_array($input['education10th']) ? json_encode($input['education10th']) : $input['education10th']) : null;
     $education12th = isset($input['education12th']) ? (is_array($input['education12th']) ? json_encode($input['education12th']) : $input['education12th']) : null;
 
+    // INSERT IGNORE: if student with same id already exists, skip silently (safe for auto-sync)
     $stmt = $pdo->prepare("
-        INSERT INTO students (id, name, roll_no, email, phone, department, branch_code, cgpa, backlogs, passing_year, skills, status, placed_company, placed_package, resume_url, avatar, linkedin, github, headline, location, projects, certifications, education_10th, education_12th)
+        INSERT IGNORE INTO students (id, name, roll_no, email, phone, department, branch_code, cgpa, backlogs, passing_year, skills, status, placed_company, placed_package, resume_url, avatar, linkedin, github, headline, location, projects, certifications, education_10th, education_12th)
         VALUES (:id, :name, :roll_no, :email, :phone, :department, :branch_code, :cgpa, :backlogs, :passing_year, :skills, :status, :placed_company, :placed_package, :resume_url, :avatar, :linkedin, :github, :headline, :location, :projects, :certifications, :education_10th, :education_12th)
     ");
 

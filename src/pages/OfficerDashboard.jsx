@@ -46,6 +46,7 @@ import { NewJobModal } from '../components/NewJobModal';
 import { ScheduleInterviewModal } from '../components/ScheduleInterviewModal';
 import { OfferLetterModal } from '../components/OfferLetterModal';
 import { ResumeModal } from '../components/ResumeModal';
+import { AddRecruiterModal } from '../components/AddRecruiterModal';
 
 export const OfficerDashboard = () => {
   const { 
@@ -61,15 +62,20 @@ export const OfficerDashboard = () => {
     showToast,
     fireConfetti,
     authSession,
-    currentRole
+    currentRole,
+    recruitersList,
+    approveRecruiter,
+    rejectRecruiter,
+    deleteRecruiter
   } = usePlacement();
 
-  // Active sub-tab
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'students' | 'companies' | 'drives' | 'interviews' | 'applications'
+  // Active sub-tab: 'overview' | 'students' | 'recruiters' | 'companies' | 'drives' | 'interviews' | 'applications'
+  const [activeTab, setActiveTab] = useState('overview');
 
   // Modals
   const [studentModalOpen, setStudentModalOpen] = useState(false);
   const [companyModalOpen, setCompanyModalOpen] = useState(false);
+  const [recruiterModalOpen, setRecruiterModalOpen] = useState(false);
   const [jobModalOpen, setJobModalOpen] = useState(false);
   const [interviewModalOpen, setInterviewModalOpen] = useState(false);
   const [selectedOfferApp, setSelectedOfferApp] = useState(null);
@@ -82,6 +88,25 @@ export const OfficerDashboard = () => {
 
   const [companySearch, setCompanySearch] = useState('');
   const [jobSearch, setJobSearch] = useState('');
+
+  // Recruiter Search & Filters
+  const [recruiterSearch, setRecruiterSearch] = useState('');
+  const [recruiterStatusFilter, setRecruiterStatusFilter] = useState('All');
+
+  const pendingRecruiters = (recruitersList || []).filter(r => r.status === 'Pending');
+  const approvedRecruiters = (recruitersList || []).filter(r => r.status === 'Approved');
+  const rejectedRecruiters = (recruitersList || []).filter(r => r.status === 'Rejected');
+
+  const filteredRecruiters = (recruitersList || []).filter(r => {
+    const q = recruiterSearch.toLowerCase().trim();
+    const matchQuery = !q ||
+      (r.name || '').toLowerCase().includes(q) ||
+      (r.companyName || '').toLowerCase().includes(q) ||
+      (r.email || '').toLowerCase().includes(q) ||
+      (r.phone || '').toLowerCase().includes(q);
+    const matchStatus = recruiterStatusFilter === 'All' || r.status === recruiterStatusFilter;
+    return matchQuery && matchStatus;
+  });
 
   // Statistics
   const totalStudents = students.length;
@@ -276,11 +301,18 @@ export const OfficerDashboard = () => {
               <span>Enroll Student</span>
             </button>
             <button
+              onClick={() => setRecruiterModalOpen(true)}
+              className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-base font-bold border border-amber-400/40 transition-all hover:scale-105 active:scale-95"
+            >
+              <UserCheck className="w-5 h-5 text-amber-400" />
+              <span>Add Recruiter</span>
+            </button>
+            <button
               onClick={() => setCompanyModalOpen(true)}
               className="flex items-center gap-2 px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-base font-bold border border-white/20 transition-all hover:scale-105 active:scale-95"
             >
               <Building2 className="w-5 h-5" />
-              <span>Add Recruiter</span>
+              <span>Add Partner Company</span>
             </button>
             <button
               onClick={() => setInterviewModalOpen(true)}
@@ -297,6 +329,12 @@ export const OfficerDashboard = () => {
           {[
             { id: 'overview', label: 'Analytics & Overview', icon: TrendingUp },
             { id: 'students', label: `Manage Students (${students.length})`, icon: Users },
+            { 
+              id: 'recruiters', 
+              label: `Recruiter Approvals (${recruitersList.length})`, 
+              icon: UserCheck, 
+              badge: pendingRecruiters.length 
+            },
             { id: 'companies', label: `Recruiting Partners (${companies.length})`, icon: Building2 },
             { id: 'drives', label: `Campus Drives (${jobs.length})`, icon: Briefcase },
             { id: 'applications', label: `Applications (${applications.length})`, icon: CheckCircle },
@@ -316,6 +354,11 @@ export const OfficerDashboard = () => {
               >
                 <Icon className="w-5 h-5" />
                 <span>{tab.label}</span>
+                {tab.badge > 0 && (
+                  <span className="ml-1.5 px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500 text-slate-950 animate-pulse shadow-sm shadow-amber-500/50">
+                    {tab.badge} Pending
+                  </span>
+                )}
               </button>
             );
           })}
@@ -325,7 +368,94 @@ export const OfficerDashboard = () => {
       {/* TAB 1: OVERVIEW & ANALYTICS */}
       {activeTab === 'overview' && (
         <div className="space-y-8 animate-fade-in">
-          
+
+          {/* Pending Recruiter Registrations Banner (Notice if any are pending approval) */}
+          {pendingRecruiters.length > 0 && (
+            <div className="p-6 sm:p-7 rounded-3xl bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/5 dark:from-amber-950/40 dark:via-orange-950/30 dark:to-slate-900 border-2 border-amber-300 dark:border-amber-700/60 shadow-xl shadow-amber-500/5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30 animate-pulse">
+                    <ShieldAlert className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-lg sm:text-xl font-black text-slate-900 dark:text-white font-['Outfit']">
+                        {pendingRecruiters.length} Recruiter Registration{pendingRecruiters.length > 1 ? 's' : ''} Awaiting Approval
+                      </h4>
+                      <span className="text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-500 text-white">
+                        Action Required
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium mt-0.5">
+                      New enterprise recruiters have registered on PlaceIQ and require Placement Directorate verification to access student resumes and post campus drives.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setActiveTab('recruiters')}
+                  className="px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-sm shrink-0 shadow-md transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+                >
+                  <span>Review All ({pendingRecruiters.length})</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Quick Approval Cards for Pending Recruiters */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+                {pendingRecruiters.slice(0, 3).map(rec => (
+                  <div 
+                    key={rec.id}
+                    className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800/60 shadow-sm flex flex-col justify-between space-y-3"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h5 className="font-black text-base text-slate-900 dark:text-white">{rec.name}</h5>
+                          <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{rec.companyName}</p>
+                        </div>
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
+                          Pending
+                        </span>
+                      </div>
+                      <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                        <div className="truncate font-medium">{rec.email}</div>
+                        {rec.phone && <div>{rec.phone}</div>}
+                        {rec.website && (
+                          <a 
+                            href={rec.website} 
+                            target="_blank" 
+                            rel="noreferrer" 
+                            className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 text-[11px] font-bold"
+                          >
+                            <span>{rec.website.replace(/^https?:\/\//, '')}</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => approveRecruiter(rec.id)}
+                        className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-sm shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Approve Access</span>
+                      </button>
+                      <button
+                        onClick={() => rejectRecruiter(rec.id)}
+                        className="py-2 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-600 dark:text-slate-400 hover:text-rose-600 font-bold text-xs transition-colors"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Key Metrics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
             <div className="p-7 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all">
@@ -689,9 +819,386 @@ export const OfficerDashboard = () => {
         </div>
       )}
 
+      {/* TAB: RECRUITER REGISTRATIONS & APPROVALS */}
+      {activeTab === 'recruiters' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Header & Stats Banner */}
+          <div className="p-7 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  Access Management
+                </span>
+                <span className="text-xs font-bold text-slate-400">
+                  {recruitersList.length} Total Accounts
+                </span>
+              </div>
+              <h3 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-2 font-['Outfit']">
+                Corporate Recruiter Approvals & Directory
+              </h3>
+              <p className="text-sm sm:text-base text-slate-500 dark:text-slate-400 mt-1 max-w-2xl font-medium">
+                Verify and approve corporate recruiters requesting campus placement privileges. Approved recruiters gain immediate access to post campus job drives and evaluate student profiles.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 shrink-0">
+              <button
+                onClick={() => setRecruiterModalOpen(true)}
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl text-sm sm:text-base font-black bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/25 hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus className="w-5 h-5" />
+                <span>+ Add Recruiter</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Metrics Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Total Recruiters</div>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-1">{recruitersList.length}</div>
+              <div className="text-xs text-slate-500 mt-1">Self-registered & invited</div>
+            </div>
+
+            <div className={`p-5 rounded-2xl bg-white dark:bg-slate-900 border ${pendingRecruiters.length > 0 ? 'border-amber-400 dark:border-amber-600/80 shadow-md shadow-amber-500/10' : 'border-slate-200 dark:border-slate-800'} shadow-xs`}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Pending Review</span>
+                {pendingRecruiters.length > 0 && (
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
+                )}
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400 mt-1">{pendingRecruiters.length}</div>
+              <div className="text-xs text-amber-600/80 dark:text-amber-400/80 mt-1 font-semibold">Requires verification</div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Approved Partners</div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400 mt-1">{approvedRecruiters.length}</div>
+              <div className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1 font-semibold">Active Hub Access</div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rejected Requests</div>
+              <div className="text-2xl sm:text-3xl font-black text-slate-600 dark:text-slate-400 mt-1">{rejectedRecruiters.length}</div>
+              <div className="text-xs text-slate-400 mt-1 font-semibold">Access restricted</div>
+            </div>
+          </div>
+
+          {/* Pending Verification Priority Queue (if any pending) */}
+          {pendingRecruiters.length > 0 && (
+            <div className="p-6 rounded-3xl bg-amber-500/10 border-2 border-amber-300 dark:border-amber-700/60 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-black">
+                    <Clock className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-slate-900 dark:text-white">
+                      Action Required: {pendingRecruiters.length} Pending Recruiter Verification Request{pendingRecruiters.length > 1 ? 's' : ''}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium">
+                      These recruiters submitted their corporate details and cannot log in until you approve their access.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {pendingRecruiters.map(rec => (
+                  <div
+                    key={rec.id}
+                    className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-800 shadow-sm flex flex-col justify-between space-y-4"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300">
+                            Awaiting Approval
+                          </span>
+                          <h5 className="text-lg font-black text-slate-900 dark:text-white mt-1">{rec.name}</h5>
+                          <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400">{rec.companyName}</p>
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black text-sm">
+                          {(rec.name || 'R').charAt(0).toUpperCase()}
+                        </div>
+                      </div>
+
+                      <div className="space-y-1.5 pt-3 mt-3 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400 font-bold shrink-0">Email:</span>
+                          <span className="truncate select-all font-semibold">{rec.email}</span>
+                        </div>
+                        {rec.phone && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-bold shrink-0">Phone:</span>
+                            <span className="font-semibold">{rec.phone}</span>
+                          </div>
+                        )}
+                        {rec.website && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-bold shrink-0">Portal:</span>
+                            <a
+                              href={rec.website}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 truncate font-bold"
+                            >
+                              <span className="truncate">{rec.website}</span>
+                              <ExternalLink className="w-3 h-3 shrink-0" />
+                            </a>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2 text-slate-400 text-[11px] pt-1">
+                          <span>Submitted: {rec.registeredAt || 'Today'}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => approveRecruiter(rec.id)}
+                        className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-md shadow-emerald-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+                      >
+                        <ShieldCheck className="w-4 h-4" />
+                        <span>Approve Access</span>
+                      </button>
+                      <button
+                        onClick={() => rejectRecruiter(rec.id)}
+                        className="py-2.5 px-3 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-600 dark:text-slate-400 hover:text-rose-600 font-bold text-xs transition-colors cursor-pointer"
+                        title="Reject application"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Search, Filter Bar, and Complete Directory */}
+          <div className="p-6 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm space-y-5">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+              <div className="relative flex-1 max-w-md">
+                <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
+                <input
+                  type="text"
+                  value={recruiterSearch}
+                  onChange={(e) => setRecruiterSearch(e.target.value)}
+                  placeholder="Search by recruiter name, enterprise, email, phone..."
+                  className="w-full pl-11 pr-4 py-3 rounded-2xl text-sm bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium focus:outline-hidden focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+                {[
+                  { id: 'All', label: `All (${recruitersList.length})` },
+                  { id: 'Pending', label: `Pending (${pendingRecruiters.length})` },
+                  { id: 'Approved', label: `Approved (${approvedRecruiters.length})` },
+                  { id: 'Rejected', label: `Rejected (${rejectedRecruiters.length})` }
+                ].map(flt => (
+                  <button
+                    key={flt.id}
+                    onClick={() => setRecruiterStatusFilter(flt.id)}
+                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer whitespace-nowrap ${
+                      recruiterStatusFilter === flt.id
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {flt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Recruiter Directory Table */}
+            {filteredRecruiters.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm sm:text-base">
+                  <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-400 uppercase tracking-wider font-black border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th className="p-4 rounded-l-2xl">Recruiter Identity</th>
+                      <th className="p-4">Enterprise / Company</th>
+                      <th className="p-4">Official Phone</th>
+                      <th className="p-4">Registered Date</th>
+                      <th className="p-4">Approval Status</th>
+                      <th className="p-4 text-right rounded-r-2xl">Administrative Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-800 dark:text-slate-200">
+                    {filteredRecruiters.map(rec => (
+                      <tr key={rec.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors">
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-300 flex items-center justify-center font-black text-sm shrink-0">
+                              {(rec.name || 'R').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div className="font-black text-slate-900 dark:text-white text-base">{rec.name}</div>
+                              <div className="text-xs text-slate-400 font-medium truncate max-w-xs">{rec.email}</div>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="p-4">
+                          <div className="font-black text-slate-900 dark:text-white">{rec.companyName}</div>
+                          {rec.website && (
+                            <a
+                              href={rec.website}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1 font-semibold"
+                            >
+                              <span>Corporate Website</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </td>
+
+                        <td className="p-4 font-semibold text-slate-600 dark:text-slate-300">
+                          {rec.phone || '—'}
+                        </td>
+
+                        <td className="p-4 text-slate-400 font-semibold text-xs sm:text-sm">
+                          {rec.registeredAt || '2026-11-01'}
+                        </td>
+
+                        <td className="p-4">
+                          {rec.status === 'Approved' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-50 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              Approved
+                            </span>
+                          ) : rec.status === 'Pending' ? (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-50 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 animate-pulse">
+                              <Clock className="w-3.5 h-3.5" />
+                              Pending Approval
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-50 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
+                              <ShieldAlert className="w-3.5 h-3.5" />
+                              Rejected
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="p-4 text-right whitespace-nowrap space-x-2">
+                          {rec.status === 'Pending' && (
+                            <>
+                              <button
+                                onClick={() => approveRecruiter(rec.id)}
+                                className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                <span>Approve</span>
+                              </button>
+                              <button
+                                onClick={() => rejectRecruiter(rec.id)}
+                                className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-600 dark:text-slate-400 hover:text-rose-600 font-bold text-xs transition-colors cursor-pointer"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          )}
+
+                          {rec.status === 'Approved' && (
+                            <button
+                              onClick={() => rejectRecruiter(rec.id)}
+                              className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-rose-50 dark:hover:bg-rose-950 text-slate-500 hover:text-rose-600 text-xs font-bold transition-colors cursor-pointer"
+                              title="Revoke access"
+                            >
+                              Revoke Access
+                            </button>
+                          )}
+
+                          {rec.status === 'Rejected' && (
+                            <button
+                              onClick={() => approveRecruiter(rec.id)}
+                              className="px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 hover:bg-emerald-100 text-xs font-black transition-colors cursor-pointer"
+                            >
+                              Re-Approve
+                            </button>
+                          )}
+
+                          <button
+                            onClick={() => deleteRecruiter(rec.id)}
+                            className="p-1.5 text-slate-300 hover:text-rose-600 rounded-xl transition-colors cursor-pointer inline-flex items-center"
+                            title="Delete recruiter record"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-12 text-center rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
+                  <UserCheck className="w-7 h-7" />
+                </div>
+                <h4 className="text-lg font-black text-slate-900 dark:text-white">No Recruiter Accounts Found</h4>
+                <p className="text-xs sm:text-sm text-slate-400 max-w-sm mx-auto">
+                  {recruiterSearch || recruiterStatusFilter !== 'All'
+                    ? 'No recruiters match your current search or filter criteria. Try resetting filters.'
+                    : 'No recruiters have registered yet. Recruiters who sign up via the Recruiter Portal will appear here.'}
+                </p>
+                <div className="pt-2 flex justify-center gap-3">
+                  {(recruiterSearch || recruiterStatusFilter !== 'All') && (
+                    <button
+                      onClick={() => {
+                        setRecruiterSearch('');
+                        setRecruiterStatusFilter('All');
+                      }}
+                      className="px-4 py-2 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white text-xs font-bold"
+                    >
+                      Reset Filters
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setRecruiterModalOpen(true)}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black"
+                  >
+                    + Add Recruiter
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* TAB 3: COMPANIES MANAGEMENT */}
       {activeTab === 'companies' && (
         <div className="space-y-6 animate-fade-in">
+          {/* Linked Recruiter Summary Banner in Companies Tab */}
+          <div className="p-4 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-900/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                <UserCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
+                  Corporate Recruiter Accounts & Registration Queue ({recruitersList.length})
+                </span>
+                <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                  {pendingRecruiters.length > 0 
+                    ? `⚠️ ${pendingRecruiters.length} recruiter accounts are currently awaiting your approval.`
+                    : 'All registered recruiter accounts are verified and up to date.'}
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={() => setActiveTab('recruiters')}
+              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shrink-0 transition-colors shadow-xs cursor-pointer"
+            >
+              Manage Recruiter Approvals ({recruitersList.length})
+            </button>
+          </div>
+
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             <div className="relative min-w-[320px]">
               <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
@@ -1009,6 +1516,7 @@ export const OfficerDashboard = () => {
       {/* Modals */}
       <AddStudentModal isOpen={studentModalOpen} onClose={() => setStudentModalOpen(false)} />
       <AddCompanyModal isOpen={companyModalOpen} onClose={() => setCompanyModalOpen(false)} />
+      <AddRecruiterModal isOpen={recruiterModalOpen} onClose={() => setRecruiterModalOpen(false)} />
       <NewJobModal isOpen={jobModalOpen} onClose={() => setJobModalOpen(false)} />
       <ScheduleInterviewModal isOpen={interviewModalOpen} onClose={() => setInterviewModalOpen(false)} />
       <OfferLetterModal application={selectedOfferApp} onClose={() => setSelectedOfferApp(null)} />

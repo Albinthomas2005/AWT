@@ -57,7 +57,14 @@ php -S 0.0.0.0:8000 -t backend
 npm run dev
 ```
 
-### 3. (Optional) Re-seed the Database
+### 3. (Optional) Using XAMPP / MySQL
+1. Start **Apache** and **MySQL** in the XAMPP Control Panel.
+2. Open your browser at [http://localhost/phpmyadmin/](http://localhost/phpmyadmin/).
+3. Click the **Import** tab.
+4. Choose [`placeiq.sql`](file:///home/albin-thomas/Music/project/placeiq.sql) and click **Go** (it creates the database `placeiq` and seeds all tables automatically).
+5. The backend will automatically detect and connect to your local XAMPP MySQL instance!
+
+### 4. (Optional) Re-seed the Database
 ```bash
 npm run db:seed
 ```

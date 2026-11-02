@@ -105,6 +105,14 @@ export const StudentDashboard = () => {
       return;
     }
 
+    // ── CGPA Eligibility Gate ──────────────────────────────────────
+    const { meetsRequirements, reasons } = checkEligibility(currentStudent, job);
+    if (!meetsRequirements) {
+      const reason = reasons.length > 0 ? reasons[0] : 'You do not meet the eligibility criteria.';
+      showToast(`❌ Cannot apply — ${reason}`, 'error');
+      return;
+    }
+
     setApplyingJob(job);
   };
 
@@ -168,14 +176,14 @@ export const StudentDashboard = () => {
                   {currentStudent.cgpa >= 9.0 && <span className="text-xs bg-emerald-400 text-slate-950 px-2 py-0.5 rounded-full uppercase font-black">Top 2%</span>}
                 </span>
                 <span className={`px-3.5 py-1.5 rounded-xl border font-bold text-sm ${
-                  currentStudent.backlogs === 0 
+                  (currentStudent.backlogs ?? 0) === 0
                     ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
                     : 'bg-rose-500/20 text-rose-300 border-rose-500/30'
                 }`}>
-                  {currentStudent.backlogs === 0 ? '✓ Zero Backlogs' : `${currentStudent.backlogs} Active Backlog`}
+                  {(currentStudent.backlogs ?? 0) === 0 ? '✓ Zero Backlogs' : `${currentStudent.backlogs} Active Backlog${currentStudent.backlogs > 1 ? 's' : ''}`}
                 </span>
                 <span className="text-slate-300 font-semibold px-3 py-1.5 rounded-xl bg-white/10">
-                  {currentStudent.branchCode} • Class of {currentStudent.passingYear}
+                  {currentStudent.branchCode} • Class of {currentStudent.passingYear ?? '–'}
                 </span>
               </div>
             </div>
@@ -374,11 +382,21 @@ export const StudentDashboard = () => {
                       </div>
                     </div>
 
-                    {/* Application policy notice */}
-                    <div className="mt-3 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 text-xs sm:text-sm font-semibold flex items-center justify-between">
-                      <span>Applications open to all candidates</span>
-                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">Permitted ✓</span>
-                    </div>
+                    {/* Application policy notice — reflects real eligibility */}
+                    {(() => {
+                      const { meetsRequirements, reasons } = checkEligibility(currentStudent, job);
+                      return meetsRequirements ? (
+                        <div className="mt-3 p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm font-semibold flex items-center justify-between border border-emerald-200 dark:border-emerald-800/40">
+                          <span>You meet all eligibility criteria</span>
+                          <span className="font-bold">Eligible ✓</span>
+                        </div>
+                      ) : (
+                        <div className="mt-3 p-2.5 rounded-xl bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 text-xs sm:text-sm font-semibold flex items-center justify-between border border-rose-200 dark:border-rose-800/40">
+                          <span>{reasons[0] || 'You do not meet eligibility requirements'}</span>
+                          <span className="font-bold">Ineligible ✗</span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Bottom Apply or Status Row */}
@@ -389,15 +407,32 @@ export const StudentDashboard = () => {
                       <div className="flex items-center gap-2">
                         <ApplicationStatusBadge status={appliedRecord?.status} />
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => handleApplyClick(job)}
-                        className="px-6 py-3 rounded-2xl font-black text-sm sm:text-base flex items-center gap-2 transition-all bg-[#6c5ce7] hover:bg-[#5b4bc4] text-white shadow-lg shadow-indigo-500/25 hover:scale-105 active:scale-95 cursor-pointer"
-                      >
-                        <span>Apply Now</span>
-                        <ArrowRight className="w-4 h-4" />
-                      </button>
-                    )}
+                    ) : (() => {
+                      const { meetsRequirements } = checkEligibility(currentStudent, job);
+                      return meetsRequirements ? (
+                        <button
+                          onClick={() => handleApplyClick(job)}
+                          className="px-6 py-3 rounded-2xl font-black text-sm sm:text-base flex items-center gap-2 transition-all bg-[#6c5ce7] hover:bg-[#5b4bc4] text-white shadow-lg shadow-indigo-500/25 hover:scale-105 active:scale-95 cursor-pointer"
+                        >
+                          <span>Apply Now</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      ) : (
+                        <div className="relative group">
+                          <button
+                            disabled
+                            className="px-6 py-3 rounded-2xl font-black text-sm sm:text-base flex items-center gap-2 bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed select-none border border-slate-300 dark:border-slate-700"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            <span>Not Eligible</span>
+                          </button>
+                          {/* Tooltip on hover */}
+                          <div className="absolute bottom-full right-0 mb-2 w-56 px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-semibold shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                            Your CGPA ({currentStudent.cgpa}) is below the minimum required ({job.minCgpa}) for this role.
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                 </div>
